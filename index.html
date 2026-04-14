@@ -9,6 +9,7 @@
 <title>루틴</title>
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html { font-size: 16px; }
@@ -211,6 +212,16 @@
     cursor: pointer; padding: 6px 10px; border-radius: 8px; font-family: inherit;
   }
   .reset-btn:active { background: #eee; }
+
+  /* 동기화 상태 배지 */
+  .sync-badge {
+    font-size: 11px; padding: 3px 8px; border-radius: 10px;
+    font-weight: 500; transition: opacity 0.3s; white-space: nowrap;
+  }
+  .sync-badge:empty { display: none; }
+  .sync-badge.saving { background: #f0f0f0; color: #888; }
+  .sync-badge.saved  { background: #E1F5EE; color: #0F6E56; }
+  .sync-badge.error  { background: #FEE2E2; color: #c0392b; }
 </style>
 </head>
 <body>
@@ -220,11 +231,14 @@
   <div class="date-label" id="dateLabel"></div>
   <div class="header-row">
     <div class="page-title">꾸준함</div>
-    <button class="refresh-btn" onclick="location.reload(true)" title="새로고침">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-        <path d="M15.5 9A6.5 6.5 0 1 1 9 2.5c1.8 0 3.4.73 4.6 1.9L12 6h4V2l-1.4 1.4A8 8 0 1 0 17 9h-1.5z" fill="currentColor"/>
-      </svg>
-    </button>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="sync-badge" id="syncBadge"></span>
+      <button class="refresh-btn" onclick="location.reload(true)" title="새로고침">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M15.5 9A6.5 6.5 0 1 1 9 2.5c1.8 0 3.4.73 4.6 1.9L12 6h4V2l-1.4 1.4A8 8 0 1 0 17 9h-1.5z" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -280,12 +294,42 @@
 </div>
 
 <script>
-const STORE = 'daily_routine_v2';
+// ──────────────────────────────
+// Supabase 설정
+// ──────────────────────────────
+const SUPABASE_URL = 'https://eowmbesmcvonpekagubc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvd21iZXNtY3ZvbnBla2FndWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMzYzMTUsImV4cCI6MjA5MTcxMjMxNX0.cXCpeVtn4IiaFxT3g7wdoYOTgiDUizOyfbCycGPlylI';
+const USER_ID = 'user_1';
+const LEGACY_STORE = 'daily_routine_v2'; // 마이그레이션 소스
+const CACHE_STORE  = 'routine_cache_v1'; // 오프라인 캐시
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let S = {};
+let TODAY = '';
 
 function getToday() { return new Date().toISOString().slice(0,10); }
 
-function load() {
-  try { const r = localStorage.getItem(STORE); if (r) return JSON.parse(r); } catch(e){}
+// ──────────────────────────────
+// 동기화 상태 배지
+// ──────────────────────────────
+let savedTimer = null;
+function setSyncStatus(status) {
+  const badge = document.getElementById('syncBadge');
+  clearTimeout(savedTimer);
+  badge.className = 'sync-badge ' + status;
+  if (status === 'saving') { badge.textContent = '저장 중'; }
+  else if (status === 'saved') {
+    badge.textContent = '저장됨';
+    savedTimer = setTimeout(() => { badge.className = 'sync-badge'; badge.textContent = ''; }, 2000);
+  } else if (status === 'error') { badge.textContent = '저장 실패'; }
+  else { badge.textContent = ''; }
+}
+
+// ──────────────────────────────
+// 데이터 변환 헬퍼
+// ──────────────────────────────
+function defaultData() {
   return {
     items: [
       { id:1, text:'아침 30분 걷기' },
@@ -296,9 +340,103 @@ function load() {
     morningTime: '08:00', eveningTime: '21:00', notifGranted: false
   };
 }
-function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch(e){} }
 
-let S = load();
+function toRow(s) {
+  return {
+    id: USER_ID,
+    items: s.items,
+    checks: s.checks,
+    streak: s.streak || 0,
+    last_date: s.lastDate || null,
+    next_id: s.nextId || 1,
+    morning_time: s.morningTime || '08:00',
+    evening_time: s.eveningTime || '21:00',
+    updated_at: new Date().toISOString()
+  };
+}
+
+function fromRow(row) {
+  return {
+    items: row.items || [],
+    checks: row.checks || {},
+    lastDate: row.last_date || null,
+    streak: row.streak || 0,
+    nextId: row.next_id || 1,
+    morningTime: row.morning_time || '08:00',
+    eveningTime: row.evening_time || '21:00',
+    notifGranted: false
+  };
+}
+
+function saveCache(s) {
+  try { localStorage.setItem(CACHE_STORE, JSON.stringify(s)); } catch(e) {}
+}
+function loadCache() {
+  try { const r = localStorage.getItem(CACHE_STORE); if (r) return JSON.parse(r); } catch(e) {}
+  return null;
+}
+
+// ──────────────────────────────
+// 데이터 로드 (Supabase + fallback)
+// ──────────────────────────────
+async function loadData() {
+  // 1. 기존 localStorage 마이그레이션
+  const legacy = localStorage.getItem(LEGACY_STORE);
+  if (legacy) {
+    try {
+      const parsed = JSON.parse(legacy);
+      await sb.from('routine_data').upsert(toRow(parsed));
+      localStorage.removeItem(LEGACY_STORE);
+      saveCache(parsed);
+      return parsed;
+    } catch(e) {
+      return JSON.parse(legacy);
+    }
+  }
+
+  // 2. Supabase에서 로드
+  try {
+    const { data, error } = await sb.from('routine_data').select('*').eq('id', USER_ID).single();
+    if (error && error.code !== 'PGRST116') throw error;
+    if (data) { const s = fromRow(data); saveCache(s); return s; }
+  } catch(e) {
+    console.warn('Supabase load failed, using cache:', e);
+  }
+
+  // 3. 오프라인 캐시 fallback
+  const cached = loadCache();
+  if (cached) return cached;
+
+  // 4. 기본값
+  return defaultData();
+}
+
+// ──────────────────────────────
+// 저장 (캐시 즉시 + Supabase async)
+// ──────────────────────────────
+async function save() {
+  saveCache(S);
+  if (!navigator.onLine) return;
+  setSyncStatus('saving');
+  try {
+    const { error } = await sb.from('routine_data').upsert(toRow(S));
+    if (error) throw error;
+    setSyncStatus('saved');
+  } catch(e) {
+    console.error('Supabase save failed:', e);
+    setSyncStatus('error');
+  }
+}
+
+// 온라인 복귀 시 동기화
+window.addEventListener('online', async () => {
+  setSyncStatus('saving');
+  try {
+    const { error } = await sb.from('routine_data').upsert(toRow(S));
+    if (error) throw error;
+    setSyncStatus('saved');
+  } catch(e) { setSyncStatus('error'); }
+});
 
 function maybeReset() {
   const today = getToday();
@@ -315,10 +453,6 @@ function maybeReset() {
   S.lastDate = today;
   save();
 }
-
-maybeReset();
-const TODAY = getToday();
-if (!S.checks[TODAY]) S.checks[TODAY] = {};
 
 function todayDone() { return (S.checks[TODAY]||{}); }
 function isAllDone() { return S.items.length>0 && S.items.every(i=>todayDone()[i.id]); }
@@ -603,8 +737,19 @@ function onDragEnd(e) {
   render();
 }
 
-setInterval(() => { maybeReset(); render(); }, 60000);
-render();
+// ──────────────────────────────
+// 앱 초기화
+// ──────────────────────────────
+async function init() {
+  S = await loadData();
+  TODAY = getToday();
+  if (!S.checks[TODAY]) S.checks[TODAY] = {};
+  maybeReset();
+  render();
+  setInterval(() => { maybeReset(); render(); }, 60000);
+}
+
+init();
 </script>
 </body>
 </html>
