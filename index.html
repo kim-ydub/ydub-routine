@@ -214,6 +214,27 @@
   }
   .reset-btn:active { background: #eee; }
 
+  /* Pull to Refresh */
+  #ptrIndicator {
+    position: fixed;
+    top: -56px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px; height: 40px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 999;
+    color: #1D9E75;
+  }
+  #ptrIndicator.spinning svg {
+    animation: ptr-spin 0.7s linear infinite;
+  }
+  @keyframes ptr-spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* 동기화 상태 배지 */
   .sync-badge {
     font-size: 11px; padding: 3px 8px; border-radius: 10px;
@@ -227,6 +248,11 @@
 </head>
 <body>
 
+<div id="ptrIndicator">
+  <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
+    <path d="M15.5 9A6.5 6.5 0 1 1 9 2.5c1.8 0 3.4.73 4.6 1.9L12 6h4V2l-1.4 1.4A8 8 0 1 0 17 9h-1.5z" fill="currentColor"/>
+  </svg>
+</div>
 <div class="safe-top"></div>
 <div class="header">
   <div class="date-label" id="dateLabel"></div>
@@ -744,6 +770,46 @@ function onDragEnd(e) {
   dragState = null;
   render();
 }
+
+// ──────────────────────────────
+// Pull to Refresh
+// ──────────────────────────────
+const PTR_THRESHOLD = 80;
+let ptrStart = null;
+
+document.addEventListener('touchstart', e => {
+  if (window.scrollY === 0)
+    ptrStart = { y: e.touches[0].clientY, x: e.touches[0].clientX };
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  if (!ptrStart) return;
+  const dy = e.touches[0].clientY - ptrStart.y;
+  const dx = Math.abs(e.touches[0].clientX - ptrStart.x);
+  if (dy <= 0 || dx > dy) { ptrStart = null; return; }
+
+  const ind = document.getElementById('ptrIndicator');
+  const topPx = Math.min(dy * 0.5, 48) - 56;
+  ind.style.transition = 'none';
+  ind.style.top = topPx + 'px';
+  const progress = Math.min(dy / PTR_THRESHOLD, 1);
+  ind.querySelector('svg').style.transform = `rotate(${progress * 360}deg)`;
+}, { passive: true });
+
+document.addEventListener('touchend', e => {
+  if (!ptrStart) return;
+  const dy = e.changedTouches[0].clientY - ptrStart.y;
+  ptrStart = null;
+  const ind = document.getElementById('ptrIndicator');
+  ind.style.transition = 'top 0.25s ease';
+  if (dy >= PTR_THRESHOLD) {
+    ind.style.top = '16px';
+    ind.classList.add('spinning');
+    setTimeout(() => location.reload(true), 500);
+  } else {
+    ind.style.top = '-56px';
+  }
+});
 
 // ──────────────────────────────
 // 앱 초기화
