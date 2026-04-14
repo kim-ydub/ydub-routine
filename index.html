@@ -46,6 +46,17 @@
   .streak-label { font-size: 13px; color: #888; margin-top: 2px; }
   .streak-sub { font-size: 12px; color: #aaa; margin-top: 3px; }
 
+  /* 드래그 핸들 */
+  .drag-handle {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    color: #ccc; cursor: grab; flex-shrink: 0;
+    touch-action: none;
+  }
+  .drag-handle:active { cursor: grabbing; }
+  .check-item.dragging { opacity: 0.35; }
+  .check-item.drag-over { box-shadow: inset 0 2px 0 #1D9E75; }
+
   /* 진행률 */
   .progress-wrap { margin: 1rem 1rem 0; }
   .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -200,15 +211,15 @@
 <div class="safe-top"></div>
 <div class="header">
   <div class="date-label" id="dateLabel"></div>
-  <div class="page-title">오늘의 루틴</div>
+  <div class="page-title">꾸준함</div>
 </div>
 
 <div class="streak-card">
   <div class="streak-left">🔥</div>
   <div>
     <div class="streak-num" id="streakNum">0</div>
-    <div class="streak-label">일 연속 달성</div>
-    <div class="streak-sub" id="streakSub">오늘 모든 항목을 완료하면 시작돼요</div>
+    <div class="streak-label">일간 꾸준하였습니다</div>
+    <div class="streak-sub" id="streakSub"></div>
   </div>
 </div>
 
@@ -317,7 +328,7 @@ function render() {
   if (allDone && streak > 0) sub.textContent = `${streak}일째 연속 달성 중!`;
   else if (allDone) sub.textContent = '오늘 완료! 내일도 이어가면 스트릭 시작';
   else if (streak > 0) sub.textContent = `어제까지 ${streak}일 — 오늘도 완료하면 유지돼요`;
-  else sub.textContent = '오늘 모든 항목을 완료하면 시작돼요';
+  else sub.textContent = '';
 
   const now = new Date();
   document.getElementById('dateLabel').textContent =
@@ -336,6 +347,16 @@ function render() {
     div.className = 'check-item' + (checked?' checked':'');
     div.dataset.id = item.id;
     div.innerHTML = `
+      <div class="drag-handle" data-id="${item.id}">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <circle cx="4" cy="3" r="1.2" fill="currentColor"/>
+          <circle cx="4" cy="7" r="1.2" fill="currentColor"/>
+          <circle cx="4" cy="11" r="1.2" fill="currentColor"/>
+          <circle cx="10" cy="3" r="1.2" fill="currentColor"/>
+          <circle cx="10" cy="7" r="1.2" fill="currentColor"/>
+          <circle cx="10" cy="11" r="1.2" fill="currentColor"/>
+        </svg>
+      </div>
       <div class="checkbox">
         <svg class="check-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
           <path d="M2 6l3 3 5-5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -353,6 +374,9 @@ function render() {
     div.addEventListener('click', () => toggle(item.id));
     div.querySelector('.edit-btn').addEventListener('click', e => { e.stopPropagation(); startEdit(item.id); });
     div.querySelector('.del-btn').addEventListener('click', e => { e.stopPropagation(); deleteItem(item.id); });
+    const handle = div.querySelector('.drag-handle');
+    handle.addEventListener('touchstart', onHandleTouchStart, { passive: false });
+    handle.addEventListener('mousedown', onHandleMouseDown);
     cl.appendChild(div);
   });
 
@@ -477,6 +501,92 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then(() => {
     scheduleLocalNotifs();
   });
+}
+
+// ──────────────────────────────
+// 드래그 순서 변경
+// ──────────────────────────────
+let dragState = null;
+
+function onHandleTouchStart(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const touch = e.touches[0];
+  initDrag(e.currentTarget.closest('.check-item'), touch.clientX, touch.clientY, 'touch');
+}
+
+function onHandleMouseDown(e) {
+  if (e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  initDrag(e.currentTarget.closest('.check-item'), e.clientX, e.clientY, 'mouse');
+}
+
+function initDrag(row, x, y, type) {
+  const rect = row.getBoundingClientRect();
+  const ghost = row.cloneNode(true);
+  ghost.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;
+    opacity:0.85;pointer-events:none;z-index:1000;
+    box-shadow:0 6px 20px rgba(0,0,0,0.15);border-radius:12px;background:#fff;`;
+  document.body.appendChild(ghost);
+  row.classList.add('dragging');
+  dragState = { id: parseInt(row.dataset.id), ghost, offsetY: y - rect.top, row, type };
+  if (type === 'touch') {
+    document.addEventListener('touchmove', onDragMove, { passive: false });
+    document.addEventListener('touchend', onDragEnd);
+  } else {
+    document.addEventListener('mousemove', onDragMove);
+    document.addEventListener('mouseup', onDragEnd);
+  }
+}
+
+function onDragMove(e) {
+  if (!dragState) return;
+  e.preventDefault();
+  const y = dragState.type === 'touch' ? e.touches[0].clientY : e.clientY;
+  dragState.ghost.style.top = (y - dragState.offsetY) + 'px';
+  const cl = document.getElementById('checklist');
+  cl.querySelectorAll('.check-item').forEach(r => {
+    r.classList.remove('drag-over');
+    if (parseInt(r.dataset.id) !== dragState.id) {
+      const rect = r.getBoundingClientRect();
+      if (y >= rect.top && y <= rect.bottom) r.classList.add('drag-over');
+    }
+  });
+}
+
+function onDragEnd(e) {
+  if (!dragState) return;
+  const y = dragState.type === 'touch'
+    ? (e.changedTouches ? e.changedTouches[0].clientY : 0)
+    : e.clientY;
+  const cl = document.getElementById('checklist');
+  const target = [...cl.querySelectorAll('.check-item')].find(r => {
+    if (parseInt(r.dataset.id) === dragState.id) return false;
+    const rect = r.getBoundingClientRect();
+    return y >= rect.top && y <= rect.bottom;
+  });
+  if (target) {
+    const srcIdx = S.items.findIndex(i => i.id === dragState.id);
+    const dstIdx = S.items.findIndex(i => i.id === parseInt(target.dataset.id));
+    if (srcIdx !== dstIdx) {
+      const [removed] = S.items.splice(srcIdx, 1);
+      S.items.splice(dstIdx, 0, removed);
+      save();
+    }
+  }
+  dragState.ghost.remove();
+  dragState.row.classList.remove('dragging');
+  cl.querySelectorAll('.check-item').forEach(r => r.classList.remove('drag-over'));
+  if (dragState.type === 'touch') {
+    document.removeEventListener('touchmove', onDragMove);
+    document.removeEventListener('touchend', onDragEnd);
+  } else {
+    document.removeEventListener('mousemove', onDragMove);
+    document.removeEventListener('mouseup', onDragEnd);
+  }
+  dragState = null;
+  render();
 }
 
 setInterval(() => { maybeReset(); render(); }, 60000);
