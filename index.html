@@ -314,17 +314,23 @@ function getToday() { return new Date().toISOString().slice(0,10); }
 // ──────────────────────────────
 // 동기화 상태 배지
 // ──────────────────────────────
-let savedTimer = null;
 function setSyncStatus(status) {
   const badge = document.getElementById('syncBadge');
-  clearTimeout(savedTimer);
   badge.className = 'sync-badge ' + status;
-  if (status === 'saving') { badge.textContent = '저장 중'; }
-  else if (status === 'saved') {
-    badge.textContent = '저장됨';
-    savedTimer = setTimeout(() => { badge.className = 'sync-badge'; badge.textContent = ''; }, 2000);
-  } else if (status === 'error') { badge.textContent = '저장 실패'; }
-  else { badge.textContent = ''; }
+  if (status === 'saving') {
+    badge.textContent = '저장 중';
+  } else if (status === 'saved') {
+    const now = new Date();
+    const mm  = String(now.getMonth() + 1).padStart(2, '0');
+    const dd  = String(now.getDate()).padStart(2, '0');
+    const hh  = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    badge.textContent = `${mm}/${dd} ${hh}:${min} 수정됨`;
+  } else if (status === 'error') {
+    badge.textContent = '저장 실패';
+  } else {
+    badge.textContent = '';
+  }
 }
 
 // ──────────────────────────────
