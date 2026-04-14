@@ -640,6 +640,7 @@ function scheduleLocalNotifs() {
       type: 'SCHEDULE',
       morningTime: S.morningTime || '08:00',
       eveningTime: S.eveningTime || '21:00',
+      streak: S.streak || 0,
     });
   });
 }

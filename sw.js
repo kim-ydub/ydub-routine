@@ -1,5 +1,5 @@
 // sw.js — 서비스워커
-const CACHE = 'routine-v2';
+const CACHE = 'routine-v3';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 // 설치 & 캐싱
@@ -32,11 +32,13 @@ let eveningTimer = null;
 
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'SCHEDULE') {
-    const { morningTime, eveningTime } = e.data;
+    const { morningTime, eveningTime, streak } = e.data;
     clearTimeout(morningTimer);
     clearTimeout(eveningTimer);
-    scheduleDailyNotif(morningTime, '아침 루틴 시작! 💪', '오늘도 루틴을 시작해볼까요?', 'morning');
-    scheduleDailyNotif(eveningTime, '저녁 리마인드 🌙', '오늘 루틴, 아직 완료하지 않은 항목이 있어요.', 'evening');
+    const title = `꾸준함 ${streak || 0}일차`;
+    const body = '꾸준함을 이어가 보자.';
+    scheduleDailyNotif(morningTime, title, body, 'morning');
+    scheduleDailyNotif(eveningTime, title, body, 'evening');
   }
 });
 
