@@ -1,5 +1,5 @@
 # ydub-routine — CLAUDE.md
-> 최근 수정: 2026-04-15 14:16:44 (KST)
+> 최근 수정: 2026-04-15 14:18:34 (KST)
 
 ## 프로젝트 개요
 매일 루틴을 체크하고 연속 달성 스트릭(streak)을 쌓는 PWA(Progressive Web App).
@@ -108,6 +108,7 @@ supabase/SETUP.md                   # Supabase 설정 가이드
 ## 버전 푸터
 - 앱 최하단에 마지막 수정일자 표시 (`yyyy-mm-dd hh:mm`)
 - 클릭 시 `/CLAUDE.md`를 fetch해 하단 시트 모달로 표시
+- **CLAUDE.md 수정 시 반드시 `index.html`의 버전 푸터 타임스탬프도 함께 업데이트해야 한다.** (`<div class="version-footer">` 내 버튼 텍스트)
 
 ## 배포
 - **플랫폼**: Vercel (GitHub 연동, main 브랜치 push 시 자동 배포)
