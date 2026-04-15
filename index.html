@@ -244,6 +244,54 @@
   .sync-badge.saving { background: #f0f0f0; color: #888; }
   .sync-badge.saved  { background: #E1F5EE; color: #0F6E56; }
   .sync-badge.error  { background: #FEE2E2; color: #c0392b; }
+
+  /* 버전 푸터 */
+  .version-footer {
+    text-align: center;
+    padding: 1.5rem 1rem 2.5rem;
+  }
+  .version-footer button {
+    background: none; border: none;
+    font-size: 11px; color: #ccc;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+    padding: 0;
+  }
+  .version-footer button:active { color: #999; }
+
+  /* CLAUDE.md 모달 */
+  .claude-modal {
+    display: none;
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.45);
+    align-items: flex-end;
+  }
+  .claude-modal.open { display: flex; }
+  .claude-sheet {
+    background: #fff;
+    width: 100%; max-height: 82vh;
+    border-radius: 20px 20px 0 0;
+    padding: 1.25rem 1.25rem 2rem;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .claude-sheet-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .claude-sheet-title { font-size: 15px; font-weight: 600; }
+  .claude-close-btn {
+    background: none; border: none;
+    font-size: 18px; color: #999; cursor: pointer; line-height: 1;
+    padding: 4px;
+  }
+  .claude-content {
+    font-size: 12px; color: #444; white-space: pre-wrap;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    line-height: 1.6;
+  }
 </style>
 </head>
 <body>
@@ -318,6 +366,20 @@
 <div class="reset-row">
   <span class="reset-info" id="resetInfo"></span>
   <button class="reset-btn" onclick="manualReset()">오늘 초기화</button>
+</div>
+
+<div class="version-footer">
+  <button onclick="showClaude()">2026-04-15 13:05</button>
+</div>
+
+<div class="claude-modal" id="claudeModal" onclick="if(event.target===this)closeClaude()">
+  <div class="claude-sheet">
+    <div class="claude-sheet-header">
+      <span class="claude-sheet-title">CLAUDE.md</span>
+      <button class="claude-close-btn" onclick="closeClaude()">✕</button>
+    </div>
+    <pre class="claude-content" id="claudeContent">불러오는 중...</pre>
+  </div>
 </div>
 
 <script>
@@ -833,6 +895,23 @@ document.addEventListener('touchend', e => {
     ind.style.top = '-56px';
   }
 });
+
+// ──────────────────────────────
+// CLAUDE.md 모달
+// ──────────────────────────────
+async function showClaude() {
+  document.getElementById('claudeModal').classList.add('open');
+  const el = document.getElementById('claudeContent');
+  try {
+    const res = await fetch('/CLAUDE.md');
+    el.textContent = await res.text();
+  } catch(e) {
+    el.textContent = '불러오기 실패';
+  }
+}
+function closeClaude() {
+  document.getElementById('claudeModal').classList.remove('open');
+}
 
 // ──────────────────────────────
 // 앱 초기화

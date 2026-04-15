@@ -1,6 +1,6 @@
 // sw.js — 서비스워커
-const CACHE = 'routine-v4';
-const ASSETS = ['/', '/index.html', '/manifest.json'];
+const CACHE = 'routine-v5';
+const ASSETS = ['/', '/index.html', '/manifest.json', '/CLAUDE.md'];
 
 // 설치 & 캐싱
 self.addEventListener('install', e => {

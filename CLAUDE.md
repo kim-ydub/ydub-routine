@@ -1,5 +1,5 @@
 # ydub-routine — CLAUDE.md
-> 최근 수정: 2026-04-15 (KST)
+> 최근 수정: 2026-04-15 13:05:00 (KST)
 
 ## 프로젝트 개요
 매일 루틴을 체크하고 연속 달성 스트릭(streak)을 쌓는 PWA(Progressive Web App).
@@ -103,6 +103,6 @@ generate_icons.py  # 아이콘 생성 스크립트
 
 ## 코드 수정 시 주의사항
 - **Supabase 스키마 변경** 시 `toRow()` / `fromRow()` 함수를 함께 수정해야 한다.
-- **서비스워커 변경** 시 `sw.js`의 `CACHE` 상수 버전을 올려야 구 캐시가 삭제된다. (현재: `routine-v4`)
+- **서비스워커 변경** 시 `sw.js`의 `CACHE` 상수 버전을 올려야 구 캐시가 삭제된다. (현재: `routine-v5`)
 - **알림 streak 반영**: `scheduleLocalNotifs()`에서 `S.streak`을 SW에 전달하므로, 앱 재방문 시 최신 streak로 갱신된다.
 - **Pull-to-Refresh**: `PTR_THRESHOLD = 80`(px). 스탠드얼론 PWA 모드에서만 정상 작동.
