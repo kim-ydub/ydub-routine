@@ -1,5 +1,5 @@
 # ydub-routine — CLAUDE.md
-> 최근 수정: 2026-04-15 13:32:00 (KST)
+> 최근 수정: 2026-04-15 13:38:47 (KST)
 
 ## 프로젝트 개요
 매일 루틴을 체크하고 연속 달성 스트릭(streak)을 쌓는 PWA(Progressive Web App).
@@ -121,6 +121,6 @@ supabase/SETUP.md                   # Supabase 설정 가이드
 
 ## 코드 수정 시 주의사항
 - **Supabase 스키마 변경** 시 `toRow()` / `fromRow()` 함수를 함께 수정해야 한다. (`push_subscription`은 S에 없으므로 별도 upsert)
-- **서비스워커 변경** 시 `sw.js`의 `CACHE` 상수 버전을 올려야 구 캐시가 삭제된다. (현재: `routine-v6`)
+- **서비스워커 변경** 시 `sw.js`의 `CACHE` 상수 버전을 올려야 구 캐시가 삭제된다. (현재: `routine-v7`)
 - **VAPID 키 변경** 시 기존 구독이 모두 무효화되므로, 모든 사용자가 재구독 필요.
 - **Pull-to-Refresh**: `PTR_THRESHOLD = 80`(px). 스탠드얼론 PWA 모드에서만 정상 작동.
