@@ -564,7 +564,6 @@ function render() {
   document.getElementById('morningTime').value = S.morningTime||'08:00';
   document.getElementById('eveningTime').value = S.eveningTime||'21:00';
   updateNotifBtn();
-  scheduleLocalNotifs();
 }
 
 function toggle(id) {
@@ -669,13 +668,37 @@ document.getElementById('eveningTime').addEventListener('change', e => {
 function scheduleLocalNotifs() {
   if (!('serviceWorker' in navigator) || Notification.permission !== 'granted') return;
   navigator.serviceWorker.ready.then(reg => {
-    reg.active && reg.active.postMessage({
+    const sw = reg.active || navigator.serviceWorker.controller;
+    if (sw) sw.postMessage({
       type: 'SCHEDULE',
       morningTime: S.morningTime || '08:00',
       eveningTime: S.eveningTime || '21:00',
       streak: S.streak || 0,
     });
   });
+}
+
+// 앱 열었을 때 오늘 이미 지난 알림 시각이면 즉시 표시
+function checkMissedNotifications() {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const today = getToday();
+  const now = new Date();
+  const nowMins = now.getHours() * 60 + now.getMinutes();
+  const shown = JSON.parse(localStorage.getItem('notif_shown_v1') || '{}');
+  const title = `꾸준함 ${S.streak||0}일차`;
+  const body = '꾸준함을 이어가 보자.';
+  const [mh, mm] = (S.morningTime||'08:00').split(':').map(Number);
+  const [eh, em] = (S.eveningTime||'21:00').split(':').map(Number);
+  if (nowMins >= mh*60+mm && shown.morning !== today) {
+    new Notification(title, { body, icon: '/icons/icon-192.png', badge: '/icons/icon-96.png', tag: 'morning' });
+    shown.morning = today;
+    localStorage.setItem('notif_shown_v1', JSON.stringify(shown));
+  }
+  if (nowMins >= eh*60+em && shown.evening !== today) {
+    new Notification(title, { body, icon: '/icons/icon-192.png', badge: '/icons/icon-96.png', tag: 'evening' });
+    shown.evening = today;
+    localStorage.setItem('notif_shown_v1', JSON.stringify(shown));
+  }
 }
 
 // 서비스워커 등록
@@ -820,7 +843,8 @@ async function init() {
   if (!S.checks[TODAY]) S.checks[TODAY] = {};
   maybeReset();
   render();
-  setInterval(() => { maybeReset(); render(); }, 60000);
+  checkMissedNotifications();
+  setInterval(() => { TODAY = getToday(); maybeReset(); render(); }, 60000);
 }
 
 init();

@@ -1,5 +1,5 @@
 // sw.js — 서비스워커
-const CACHE = 'routine-v3';
+const CACHE = 'routine-v4';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 // 설치 & 캐싱
@@ -19,26 +19,71 @@ self.addEventListener('activate', e => {
 
 // 오프라인 대응
 self.addEventListener('fetch', e => {
+  // SW 재시작 시 저장된 스케줄로 타이머 복원
+  if (!timerRestored) {
+    timerRestored = true;
+    restoreSchedule();
+  }
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request))
   );
 });
 
 // ──────────────────────────────
+// IndexedDB 헬퍼
+// ──────────────────────────────
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('routine-sw', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('kv');
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = rej;
+  });
+}
+function idbGet(key) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const req = db.transaction('kv','readonly').objectStore('kv').get(key);
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = rej;
+  }));
+}
+function idbSet(key, val) {
+  return openDB().then(db => new Promise((res, rej) => {
+    const tx = db.transaction('kv','readwrite');
+    tx.objectStore('kv').put(val, key);
+    tx.oncomplete = res;
+    tx.onerror = rej;
+  }));
+}
+
+// ──────────────────────────────
 // 알림 스케줄링
 // ──────────────────────────────
 let morningTimer = null;
 let eveningTimer = null;
+let timerRestored = false;
 
-self.addEventListener('message', e => {
+async function restoreSchedule() {
+  try {
+    const data = await idbGet('schedule');
+    if (data) applySchedule(data);
+  } catch(e) {}
+}
+
+function applySchedule({ morningTime, eveningTime, streak }) {
+  clearTimeout(morningTimer);
+  clearTimeout(eveningTimer);
+  const title = `꾸준함 ${streak || 0}일차`;
+  const body = '꾸준함을 이어가 보자.';
+  scheduleDailyNotif(morningTime, title, body, 'morning');
+  scheduleDailyNotif(eveningTime, title, body, 'evening');
+}
+
+self.addEventListener('message', async e => {
   if (e.data && e.data.type === 'SCHEDULE') {
     const { morningTime, eveningTime, streak } = e.data;
-    clearTimeout(morningTimer);
-    clearTimeout(eveningTimer);
-    const title = `꾸준함 ${streak || 0}일차`;
-    const body = '꾸준함을 이어가 보자.';
-    scheduleDailyNotif(morningTime, title, body, 'morning');
-    scheduleDailyNotif(eveningTime, title, body, 'evening');
+    await idbSet('schedule', { morningTime, eveningTime, streak });
+    applySchedule({ morningTime, eveningTime, streak });
   }
 });
 
