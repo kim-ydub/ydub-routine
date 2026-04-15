@@ -389,6 +389,7 @@
 const SUPABASE_URL = 'https://eowmbesmcvonpekagubc.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvd21iZXNtY3ZvbnBla2FndWJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxMzYzMTUsImV4cCI6MjA5MTcxMjMxNX0.cXCpeVtn4IiaFxT3g7wdoYOTgiDUizOyfbCycGPlylI';
 const USER_ID = 'user_1';
+const VAPID_PUBLIC_KEY = 'BFtj5vMim5jW55vJpD0N_XefpTEkDpnxbmumu2xhpmQui0O2LhTeGFmJIRbtjAONrQ-IXdQ1UKigli7eivo2byk';
 const LEGACY_STORE = 'daily_routine_v2'; // 마이그레이션 소스
 const CACHE_STORE  = 'routine_cache_v1'; // 오프라인 캐시
 
@@ -715,7 +716,32 @@ async function requestNotif() {
   S.notifGranted = perm === 'granted';
   save();
   updateNotifBtn();
-  if (perm === 'granted') scheduleLocalNotifs();
+  if (perm === 'granted') await subscribePush();
+}
+
+// base64url → Uint8Array (applicationServerKey 변환용)
+function urlBase64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+// Web Push 구독 & Supabase 저장
+async function subscribePush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await sb.from('routine_data').upsert({ id: USER_ID, push_subscription: sub.toJSON() });
+  } catch(e) {
+    console.error('Push subscription failed:', e);
+  }
 }
 
 // 시간 저장
@@ -923,6 +949,7 @@ async function init() {
   maybeReset();
   render();
   checkMissedNotifications();
+  if (Notification.permission === 'granted') subscribePush();
   setInterval(() => { TODAY = getToday(); maybeReset(); render(); }, 60000);
 }
 

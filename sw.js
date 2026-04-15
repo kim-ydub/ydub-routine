@@ -1,5 +1,5 @@
 // sw.js — 서비스워커
-const CACHE = 'routine-v5';
+const CACHE = 'routine-v6';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/CLAUDE.md'];
 
 // 설치 & 캐싱
@@ -110,6 +110,21 @@ function scheduleDailyNotif(timeStr, title, body, tag) {
   if (tag === 'morning') morningTimer = t;
   else eveningTimer = t;
 }
+
+// 서버 Web Push 수신
+self.addEventListener('push', e => {
+  const data = e.data?.json() ?? {};
+  e.waitUntil(
+    self.registration.showNotification(data.title ?? '꾸준함', {
+      body:      data.body ?? '꾸준함을 이어가 보자.',
+      icon:      '/icons/icon-192.png',
+      badge:     '/icons/icon-96.png',
+      tag:       data.tag ?? 'routine',
+      renotify:  true,
+      data:      { url: '/' },
+    })
+  );
+});
 
 // 알림 클릭 시 앱 열기
 self.addEventListener('notificationclick', e => {

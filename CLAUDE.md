@@ -1,5 +1,5 @@
 # ydub-routine — CLAUDE.md
-> 최근 수정: 2026-04-15 13:05:00 (KST)
+> 최근 수정: 2026-04-15 13:20:00 (KST)
 
 ## 프로젝트 개요
 매일 루틴을 체크하고 연속 달성 스트릭(streak)을 쌓는 PWA(Progressive Web App).
@@ -8,19 +8,21 @@
 
 ## 파일 구조
 ```
-index.html         # 앱 전체 (HTML + CSS + JS 인라인)
-sw.js              # 서비스워커 — 오프라인 캐싱 + 알림 스케줄링
-manifest.json      # PWA 매니페스트
-vercel.json        # Vercel 배포 설정
-icons/             # 앱 아이콘 (icon-96.png, icon-192.png, icon-512.png)
-generate_icons.py  # 아이콘 생성 스크립트
+index.html                          # 앱 전체 (HTML + CSS + JS 인라인)
+sw.js                               # 서비스워커 — 오프라인 캐싱 + push 수신
+manifest.json                       # PWA 매니페스트
+vercel.json                         # Vercel 배포 설정
+icons/                              # 앱 아이콘 (icon-96.png, icon-192.png, icon-512.png)
+generate_icons.py                   # 아이콘 생성 스크립트
+supabase/functions/notify/index.ts  # Edge Function — Web Push 발송
+supabase/SETUP.md                   # Supabase 설정 가이드
 ```
 
 ## 핵심 설계 원칙
 - **단일 파일**: index.html 하나에 CSS와 JS가 모두 포함된다. 별도 파일로 분리하지 않는다.
 - **프레임워크 없음**: React/Vue 등 사용하지 않음. 순수 Vanilla JS.
 - **Supabase 저장**: 상태는 `routine_data` 테이블에 upsert. 오프라인 시 `routine_cache_v1` 키로 localStorage 캐시 사용.
-- **오프라인 우선**: 서비스워커가 `/`, `/index.html`, `/manifest.json`을 캐싱.
+- **오프라인 우선**: 서비스워커가 `/`, `/index.html`, `/manifest.json`, `/CLAUDE.md`를 캐싱.
 
 ## Supabase 설정
 - **Project URL**: `https://eowmbesmcvonpekagubc.supabase.co`
@@ -39,6 +41,7 @@ generate_icons.py  # 아이콘 생성 스크립트
 | morning_time | text | 아침 알림 시각 |
 | evening_time | text | 저녁 알림 시각 |
 | updated_at | timestamptz | 마지막 저장 시각 |
+| push_subscription | jsonb | Web Push 구독 정보 (nullable) |
 
 ## 상태 구조 (`S` 객체, 인메모리)
 ```js
@@ -52,6 +55,7 @@ generate_icons.py  # 아이콘 생성 스크립트
   eveningTime: "HH:MM",    // 저녁 알림 시각
   notifGranted: boolean     // 알림 권한 여부 (로컬 전용)
 }
+// push_subscription은 S에 포함되지 않음 — Supabase에 직접 upsert
 ```
 
 ## 데이터 흐름
@@ -76,12 +80,22 @@ generate_icons.py  # 아이콘 생성 스크립트
 - **스트릭 계산**: 전날 모든 항목이 완료됐을 경우 +1, 하루라도 건너뛰면 0으로 리셋.
 - **드래그 순서 변경**: 항목 좌측 핸들(6점 그립)을 터치/마우스로 드래그하여 순서 변경.
 - **Pull-to-Refresh**: 최상단에서 80px 이상 아래로 당기면 원형 인디케이터가 나타나며 새로고침.
-- **알림**: 서비스워커에 `SCHEDULE` 메시지(morningTime, eveningTime, streak 포함)를 보내고, SW가 `setTimeout`으로 매일 같은 시각에 반복 알림.
 
-## 알림 문구 (sw.js)
-- **아침/저녁 공통**
-  - title: `꾸준함 n일차` (n = 현재 streak)
-  - body: `꾸준함을 이어가 보자.`
+## 알림 구조 (이중 레이어)
+### 1. 서버 Web Push (메인, 앱 종료 상태에서도 동작)
+- 앱 열기 → `subscribePush()` → PushSubscription → Supabase `push_subscription` 저장
+- pg_cron 매분 실행 → Edge Function `notify` → KST 현재시각 == morning_time or evening_time → `web-push`로 발송
+- SW `push` 이벤트 수신 → 알림 표시
+- VAPID Public Key: `BFtj5vMim5jW55vJpD0N_XefpTEkDpnxbmumu2xhpmQui0O2LhTeGFmJIRbtjAONrQ-IXdQ1UKigli7eivo2byk`
+- 설정 가이드: `supabase/SETUP.md`
+
+### 2. 클라이언트 Fallback (앱 열었을 때)
+- `checkMissedNotifications()`: 앱 열 때 오늘 알림 시각이 지났고 아직 표시 안 했으면 즉시 표시
+- SW setTimeout: 앱이 열려 있는 동안 scheduled 알림 (SW 종료 시 소멸)
+
+## 알림 문구
+- title: `꾸준함 n일차` (n = 현재 streak)
+- body: `꾸준함을 이어가 보자.`
 
 ## UI 주요 텍스트
 | 위치 | 텍스트 |
@@ -90,6 +104,10 @@ generate_icons.py  # 아이콘 생성 스크립트
 | 헤더 | `꾸준함` |
 | 스트릭 라벨 | `일간 꾸준하였습니다` |
 | 완료 배너 | `오늘 루틴 완료! 💪 내일도 이어가요` |
+
+## 버전 푸터
+- 앱 최하단에 마지막 수정일자 표시 (`yyyy-mm-dd hh:mm`)
+- 클릭 시 `/CLAUDE.md`를 fetch해 하단 시트 모달로 표시
 
 ## 배포
 - **플랫폼**: Vercel (GitHub 연동, main 브랜치 push 시 자동 배포)
@@ -102,7 +120,7 @@ generate_icons.py  # 아이콘 생성 스크립트
 - 배경: `#f5f5f0`
 
 ## 코드 수정 시 주의사항
-- **Supabase 스키마 변경** 시 `toRow()` / `fromRow()` 함수를 함께 수정해야 한다.
-- **서비스워커 변경** 시 `sw.js`의 `CACHE` 상수 버전을 올려야 구 캐시가 삭제된다. (현재: `routine-v5`)
-- **알림 streak 반영**: `scheduleLocalNotifs()`에서 `S.streak`을 SW에 전달하므로, 앱 재방문 시 최신 streak로 갱신된다.
+- **Supabase 스키마 변경** 시 `toRow()` / `fromRow()` 함수를 함께 수정해야 한다. (`push_subscription`은 S에 없으므로 별도 upsert)
+- **서비스워커 변경** 시 `sw.js`의 `CACHE` 상수 버전을 올려야 구 캐시가 삭제된다. (현재: `routine-v6`)
+- **VAPID 키 변경** 시 기존 구독이 모두 무효화되므로, 모든 사용자가 재구독 필요.
 - **Pull-to-Refresh**: `PTR_THRESHOLD = 80`(px). 스탠드얼론 PWA 모드에서만 정상 작동.
