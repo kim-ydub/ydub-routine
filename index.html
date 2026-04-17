@@ -369,7 +369,7 @@
 </div>
 
 <div class="version-footer">
-  <button onclick="showClaude()">2026-04-18 08:59</button>
+  <button onclick="showClaude()">2026-04-18 09:30</button>
 </div>
 
 <div class="claude-modal" id="claudeModal" onclick="if(event.target===this)closeClaude()">
@@ -398,7 +398,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let S = {};
 let TODAY = '';
 
-function getToday() { return new Date().toISOString().slice(0,10); }
+function getToday() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
 // ──────────────────────────────
 // 동기화 상태 배지
