@@ -1,5 +1,5 @@
 # ydub-routine — CLAUDE.md
-> 최근 수정: 2026-04-18 09:30:00 (KST)
+> 최근 수정: 2026-04-18 00:30:00 (KST)
 
 ## 프로젝트 개요
 매일 루틴을 체크하고 연속 달성 스트릭(streak)을 쌓는 PWA(Progressive Web App).

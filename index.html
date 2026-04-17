@@ -369,7 +369,7 @@
 </div>
 
 <div class="version-footer">
-  <button onclick="showClaude()">2026-04-18 09:30</button>
+  <button onclick="showClaude()">2026-04-18 00:30</button>
 </div>
 
 <div class="claude-modal" id="claudeModal" onclick="if(event.target===this)closeClaude()">
@@ -951,6 +951,9 @@ async function init() {
   checkMissedNotifications();
   if (Notification.permission === 'granted') subscribePush();
   setInterval(() => { TODAY = getToday(); maybeReset(); render(); }, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { TODAY = getToday(); maybeReset(); render(); }
+  });
 }
 
 init();
