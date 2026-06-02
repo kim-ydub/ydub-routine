@@ -54,6 +54,17 @@
   .streak-num { font-size: 30px; font-weight: 700; color: #1a1a1a; line-height: 1; }
   .streak-label { font-size: 13px; color: #888; margin-top: 2px; }
   .streak-sub { font-size: 12px; color: #aaa; margin-top: 3px; }
+  .streak-edit-btn {
+    background: none; border: none; color: #ddd; cursor: pointer;
+    padding: 2px 4px; border-radius: 6px; display: flex; align-items: center;
+    transition: color 0.15s; flex-shrink: 0;
+  }
+  .streak-edit-btn:active { color: #1D9E75; }
+  .streak-edit-input {
+    width: 56px; font-size: 30px; font-weight: 700;
+    border: none; border-bottom: 2px solid #1D9E75; outline: none;
+    background: transparent; color: #1a1a1a; text-align: center; padding: 0; line-height: 1;
+  }
 
   /* 드래그 핸들 */
   .drag-handle {
@@ -319,8 +330,13 @@
 
 <div class="streak-card">
   <div class="streak-left">🔥</div>
-  <div>
-    <div class="streak-num" id="streakNum">0</div>
+  <div style="flex:1">
+    <div style="display:flex;align-items:baseline;gap:6px">
+      <div class="streak-num" id="streakNum">0</div>
+      <button class="streak-edit-btn" id="streakEditBtn" onclick="startStreakEdit()" title="streak 수정">
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M9.5 2.5l2 2L4 12H2v-2L9.5 2.5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
     <div class="streak-label">일간 꾸준하였습니다</div>
     <div class="streak-sub" id="streakSub"></div>
   </div>
@@ -369,7 +385,7 @@
 </div>
 
 <div class="version-footer">
-  <button onclick="showClaude()">2026-04-18 00:30</button>
+  <button onclick="showClaude()">2026-06-02 22:00</button>
 </div>
 
 <div class="claude-modal" id="claudeModal" onclick="if(event.target===this)closeClaude()">
@@ -536,16 +552,17 @@ window.addEventListener('online', async () => {
 
 function maybeReset() {
   const today = getToday();
-  if (S.lastDate && S.lastDate !== today) {
-    const yest = new Date(today); yest.setDate(yest.getDate()-1);
-    const yStr = yest.toISOString().slice(0,10);
+  if (S.lastDate === today) return; // 같은 날: 아무것도 하지 않음 (수동 수정 보호)
+  if (S.lastDate) {
+    // 날짜가 바뀐 경우: 이전 날 100% 완료 여부로 streak 평가
+    const yest = new Date(today); yest.setDate(yest.getDate() - 1);
+    const yStr = yest.toISOString().slice(0, 10);
     const prevChecks = S.checks[S.lastDate] || {};
-    const allDoneYest = S.items.length > 0 && S.items.every(i => prevChecks[i.id]);
-    if (S.lastDate === yStr && allDoneYest) S.streak = (S.streak||0) + 1;
+    const allDone = S.items.length > 0 && S.items.every(i => prevChecks[i.id]);
+    if (S.lastDate === yStr && allDone) S.streak = (S.streak || 0) + 1;
     else S.streak = 0;
-    if (!S.checks[today]) S.checks[today] = {};
   }
-  if (!S.lastDate) S.checks[today] = S.checks[today] || {};
+  if (!S.checks[today]) S.checks[today] = {};
   S.lastDate = today;
   save();
 }
@@ -566,8 +583,12 @@ function render() {
   const allDone = isAllDone();
   document.getElementById('doneBanner').style.display = allDone ? 'block' : 'none';
 
-  let streak = S.streak||0;
-  document.getElementById('streakNum').textContent = streak;
+  let streak = S.streak || 0;
+  const streakNumEl = document.getElementById('streakNum');
+  if (!streakNumEl.querySelector('input')) {
+    streakNumEl.textContent = streak;
+    document.getElementById('streakEditBtn').style.display = '';
+  }
   const sub = document.getElementById('streakSub');
   if (allDone && streak > 0) sub.textContent = `${streak}일째 연속 달성 중!`;
   else if (allDone) sub.textContent = '오늘 완료! 내일도 이어가면 스트릭 시작';
@@ -687,6 +708,36 @@ function manualReset() {
   if(confirm('오늘 체크를 모두 초기화할까요?')) {
     S.checks[TODAY]={}; save(); render();
   }
+}
+
+function startStreakEdit() {
+  const numEl = document.getElementById('streakNum');
+  if (!numEl || numEl.querySelector('input')) return;
+  document.getElementById('streakEditBtn').style.display = 'none';
+  numEl.innerHTML = '';
+  const inp = document.createElement('input');
+  inp.className = 'streak-edit-input';
+  inp.type = 'number';
+  inp.min = '0';
+  inp.value = S.streak || 0;
+  numEl.appendChild(inp);
+  inp.focus(); inp.select();
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmStreakEdit();
+    if (e.key === 'Escape') render();
+  });
+  inp.addEventListener('blur', () => setTimeout(confirmStreakEdit, 100));
+}
+
+function confirmStreakEdit() {
+  const inp = document.querySelector('#streakNum input');
+  if (!inp) return;
+  const val = parseInt(inp.value, 10);
+  if (!isNaN(val) && val >= 0) {
+    S.streak = val;
+    save();
+  }
+  render();
 }
 
 // ──────────────────────────────
