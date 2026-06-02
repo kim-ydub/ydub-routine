@@ -1,5 +1,5 @@
 # ydub-routine — CLAUDE.md
-> 최근 수정: 2026-06-02 22:00:00 (KST)
+> 최근 수정: 2026-06-02 23:30:00 (KST)
 
 ## 프로젝트 개요
 매일 루틴을 체크하고 연속 달성 스트릭(streak)을 쌓는 PWA(Progressive Web App).
@@ -36,6 +36,7 @@ supabase/SETUP.md                   # Supabase 설정 가이드
 | items | jsonb | 루틴 항목 배열 |
 | checks | jsonb | 날짜별 체크 기록 |
 | streak | integer | 연속 달성 일수 |
+| max_streak | integer | 역대 최장 연속 달성 일수 |
 | last_date | text | 마지막 접속 날짜 |
 | next_id | integer | 다음 항목 ID |
 | morning_time | text | 아침 알림 시각 |
@@ -50,6 +51,7 @@ supabase/SETUP.md                   # Supabase 설정 가이드
   checks: { "YYYY-MM-DD": { [id]: true } },    // 날짜별 완료 체크
   lastDate: "YYYY-MM-DD",   // 마지막 접속 날짜 (자동 초기화 판단용)
   streak: number,           // 연속 달성 일수
+  maxStreak: number,        // 역대 최장 연속 달성 일수
   nextId: number,           // 다음 항목 ID
   morningTime: "HH:MM",    // 아침 알림 시각
   eveningTime: "HH:MM",    // 저녁 알림 시각

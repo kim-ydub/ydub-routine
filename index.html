@@ -54,6 +54,7 @@
   .streak-num { font-size: 30px; font-weight: 700; color: #1a1a1a; line-height: 1; }
   .streak-label { font-size: 13px; color: #888; margin-top: 2px; }
   .streak-sub { font-size: 12px; color: #aaa; margin-top: 3px; }
+  .streak-max { font-size: 11px; color: #ccc; margin-top: 2px; }
   .streak-edit-btn {
     background: none; border: none; color: #ddd; cursor: pointer;
     padding: 2px 4px; border-radius: 6px; display: flex; align-items: center;
@@ -339,6 +340,7 @@
     </div>
     <div class="streak-label">일간 꾸준하였습니다</div>
     <div class="streak-sub" id="streakSub"></div>
+    <div class="streak-max" id="streakMax"></div>
   </div>
 </div>
 
@@ -385,7 +387,7 @@
 </div>
 
 <div class="version-footer">
-  <button onclick="showClaude()">2026-06-02 22:00</button>
+  <button onclick="showClaude()">2026-06-02 23:30</button>
 </div>
 
 <div class="claude-modal" id="claudeModal" onclick="if(event.target===this)closeClaude()">
@@ -448,7 +450,7 @@ function defaultData() {
       { id:2, text:'물 2리터 마시기' },
       { id:3, text:'독서 20분' },
     ],
-    checks: {}, lastDate: null, streak: 0, nextId: 4,
+    checks: {}, lastDate: null, streak: 0, maxStreak: 0, nextId: 4,
     morningTime: '08:00', eveningTime: '21:00', notifGranted: false
   };
 }
@@ -463,6 +465,7 @@ function toRow(s) {
     next_id: s.nextId || 1,
     morning_time: s.morningTime || '08:00',
     evening_time: s.eveningTime || '21:00',
+    max_streak: s.maxStreak || 0,
     updated_at: new Date().toISOString()
   };
 }
@@ -476,6 +479,7 @@ function fromRow(row) {
     nextId: row.next_id || 1,
     morningTime: row.morning_time || '08:00',
     eveningTime: row.evening_time || '21:00',
+    maxStreak: row.max_streak || 0,
     notifGranted: false
   };
 }
@@ -559,8 +563,12 @@ function maybeReset() {
     const yStr = yest.toISOString().slice(0, 10);
     const prevChecks = S.checks[S.lastDate] || {};
     const allDone = S.items.length > 0 && S.items.every(i => prevChecks[i.id]);
-    if (S.lastDate === yStr && allDone) S.streak = (S.streak || 0) + 1;
-    else S.streak = 0;
+    if (S.lastDate === yStr && allDone) {
+      S.streak = (S.streak || 0) + 1;
+      S.maxStreak = Math.max(S.maxStreak || 0, S.streak);
+    } else {
+      S.streak = 0;
+    }
   }
   if (!S.checks[today]) S.checks[today] = {};
   S.lastDate = today;
@@ -594,6 +602,11 @@ function render() {
   else if (allDone) sub.textContent = '오늘 완료! 내일도 이어가면 스트릭 시작';
   else if (streak > 0) sub.textContent = `어제까지 ${streak}일 — 오늘도 완료하면 유지돼요`;
   else sub.textContent = '';
+
+  const maxS = S.maxStreak || 0;
+  const maxStreakEl = document.getElementById('streakMax');
+  if (maxS > 0 && maxS > streak) maxStreakEl.textContent = `가장 긴 streak은 ${maxS}일이었어요`;
+  else maxStreakEl.textContent = '';
 
   const now = new Date();
   document.getElementById('dateLabel').textContent =
@@ -735,6 +748,7 @@ function confirmStreakEdit() {
   const val = parseInt(inp.value, 10);
   if (!isNaN(val) && val >= 0) {
     S.streak = val;
+    S.maxStreak = Math.max(S.maxStreak || 0, val);
     save();
   }
   render();
