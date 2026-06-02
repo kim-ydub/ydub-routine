@@ -605,8 +605,7 @@ function render() {
 
   const maxS = S.maxStreak || 0;
   const maxStreakEl = document.getElementById('streakMax');
-  if (maxS > 0 && maxS > streak) maxStreakEl.textContent = `가장 긴 streak은 ${maxS}일이었어요`;
-  else maxStreakEl.textContent = '';
+  maxStreakEl.textContent = maxS > 0 ? `가장 긴 streak은 ${maxS}일이었어요` : '';
 
   const now = new Date();
   document.getElementById('dateLabel').textContent =
