@@ -1,5 +1,5 @@
 // sw.js — 서비스워커
-const CACHE = 'routine-v9';
+const CACHE = 'routine-v10';
 const ASSETS = ['/', '/index.html', '/manifest.json', '/CLAUDE.md'];
 
 // 설치 & 캐싱
